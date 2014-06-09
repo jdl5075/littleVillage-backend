@@ -1,3 +1,7 @@
+task makePretty(type: Delete) {
+  delete 'build'
+}
+
 apply plugin: 'java' 
 apply plugin: 'war'
 
@@ -7,12 +11,17 @@ repositories {
 
 dependencies {
 	compile 'log4j:log4j:1.2.16'
+	compile 'org.apache.commons:commons-lang3:3.3.2'
 	compile 'org.apache.commons:commons-io:1.3.2'
 	compile 'org.apache.httpcomponents:httpclient:4.3.3'
 	compile 'org.codehaus.jackson:jackson-core-asl:1.9.13'
 	compile 'org.codehaus.jackson:jackson-mapper-asl:1.9.13'
 	providedCompile 'org.apache.tomcat:tomcat-servlet-api:8.0.8'
 	compile 'org.springframework:spring-webmvc:3.2.2.RELEASE'
+	compile 'org.apache.shiro:shiro-core:1.2.3'
+	compile 'org.apache.shiro:shiro-web:1.2.3'
+	compile 'org.apache.shiro:shiro-spring:1.2.3'
+	compile 'postgresql:postgresql:9.1-901.jdbc4'
 }
 
 sourceSets {
@@ -26,4 +35,5 @@ sourceSets {
 war{
 	webInf { from 'web.xml' }
 	webInf { from 'mvc-dispatcher-servlet.xml' }
+	webInf { from 'applicationContext.xml' }
 }
