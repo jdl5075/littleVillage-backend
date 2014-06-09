@@ -4,4 +4,5 @@ public class RESTRoutes {
 	public static final String REST_PREFIX = "/rest";
 	
 	public static final String LOGIN = "/login";
+	public static final String LOGOUT = "/logout";
 }

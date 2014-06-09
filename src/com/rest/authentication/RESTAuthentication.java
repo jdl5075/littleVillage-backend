@@ -68,7 +68,7 @@ public class RESTAuthentication extends JdbcRealm{
     }
     
 	@RequestMapping(value = RESTRoutes.LOGIN, method = RequestMethod.POST)
-	public @ResponseBody void getJSON(
+	public @ResponseBody void loginUser(
 			HttpServletRequest request,
 			HttpServletResponse response) {
 		Subject currentUser = SecurityUtils.getSubject();
@@ -86,7 +86,11 @@ public class RESTAuthentication extends JdbcRealm{
 		if(!StringUtils.isBlank(emailAddress)){
 			//check if this is a different user from the current user
 			boolean differnetUser = !StringUtils.equalsIgnoreCase(emailAddress, (String) currentUser.getPrincipal()); //principal data point is their email address
-			if ( !currentUser.isAuthenticated() || differnetUser) {
+			if(differnetUser){ //different user logging in, invalidate the session and create a new one
+				currentUser.getSession(false);
+				currentUser.logout();
+			}
+			if ( !currentUser.isAuthenticated()) { //only do authentication if necessary, its expensive
 			    UsernamePasswordToken token = new UsernamePasswordToken(emailAddress, password);
 			    if(StringUtils.equalsIgnoreCase(rememberMe, "true")){
 			    	token.setRememberMe(true);
@@ -96,6 +100,9 @@ public class RESTAuthentication extends JdbcRealm{
 			    currentUser.login(token);
 			    
 			    if(currentUser.isAuthenticated()){
+			    	if(session == null){ //get a new session
+			    		session = currentUser.getSession();
+			    	}
 			    	node.put("ticket", session.getId().toString());
 			    }
 			}else{
@@ -108,6 +115,12 @@ public class RESTAuthentication extends JdbcRealm{
 		} catch (IOException e) {
 			logger.debug("Failed to create JSON object: " + e.getMessage());
 		}
+	}
+	
+	@RequestMapping(value = RESTRoutes.LOGOUT, method = RequestMethod.POST)
+	public @ResponseBody void logoutUser() {
+		Subject currentUser = SecurityUtils.getSubject();
+		currentUser.logout();
 	}
 	
 	/**
