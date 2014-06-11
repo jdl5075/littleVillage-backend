@@ -5,10 +5,44 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Value;
 
 public class DatabaseConnection {
 	
 	static Logger logger = Logger.getLogger(DatabaseConnection.class);
+	
+	@Value(value="${db.url}")
+	private static String dbUrl;
+	
+	public String getDbUrl(){
+		return dbUrl;
+	}
+	
+	public void setDbUrl(String dbUrl){
+		this.dbUrl = dbUrl;
+	}
+	 
+	@Value(value="${db.username}")
+	private static String dbUsername;
+	
+	public String getDbUsername(){
+		return dbUsername;
+	}
+	
+	public void setDbUsername(String dbUsername){
+		this.dbUsername = dbUsername;
+	}
+	 
+	@Value(value="${db.password}")
+	private static String dbPassword;
+	
+	public String getDbPassword(){
+		return dbPassword;
+	}
+	
+	public void setDbPassword(String dbPassword){
+		this.dbPassword = dbPassword;
+	}
 	
 	public static Connection connect(){
 		try {
@@ -21,8 +55,7 @@ public class DatabaseConnection {
 	
 		try {
 			connection = DriverManager.getConnection(
-					"jdbc:postgresql://127.0.0.1:5432/postgres", "mblum",
-					"");
+					dbUrl, dbUsername, dbPassword);
 		} catch (SQLException e) {
 			logger.debug("Connection failed: " + e.getMessage());
 		}

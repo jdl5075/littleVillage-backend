@@ -1,6 +1,4 @@
-task makePretty(type: Delete) {
-  delete 'build'
-}
+delete 'build'
 
 apply plugin: 'java' 
 apply plugin: 'war'
@@ -36,4 +34,5 @@ war{
 	webInf { from 'web.xml' }
 	webInf { from 'mvc-dispatcher-servlet.xml' }
 	webInf { from 'applicationContext.xml' }
+	webInf { from 'db.properties' }
 }

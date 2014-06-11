@@ -7,6 +7,7 @@ import java.security.SecureRandom;
 import java.security.SignatureException;
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -19,14 +20,16 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.client.CookieStore;
-import org.apache.http.impl.client.BasicCookieStore;
 import org.apache.log4j.Logger;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authc.AuthenticationException;
 import org.apache.shiro.authc.AuthenticationInfo;
 import org.apache.shiro.authc.AuthenticationToken;
+import org.apache.shiro.authc.ExcessiveAttemptsException;
+import org.apache.shiro.authc.IncorrectCredentialsException;
+import org.apache.shiro.authc.LockedAccountException;
 import org.apache.shiro.authc.SimpleAuthenticationInfo;
+import org.apache.shiro.authc.UnknownAccountException;
 import org.apache.shiro.authc.UsernamePasswordToken;
 import org.apache.shiro.authz.AuthorizationInfo;
 import org.apache.shiro.authz.SimpleAuthorizationInfo;
@@ -35,13 +38,11 @@ import org.apache.shiro.session.Session;
 import org.apache.shiro.subject.PrincipalCollection;
 import org.apache.shiro.subject.Subject;
 import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.util.JSONPObject;
-import org.codehaus.jackson.node.JsonNodeFactory;
 import org.codehaus.jackson.node.ObjectNode;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.db.connect.DatabaseConnection;
@@ -59,7 +60,6 @@ public class RESTAuthentication extends JdbcRealm{
 	
 	final ObjectMapper mapper = new ObjectMapper();
 	
-	private static final String algorithm = "HmacSHA256";
 	//Add salt
     private static String getSalt() throws NoSuchAlgorithmException
     {
@@ -70,7 +70,7 @@ public class RESTAuthentication extends JdbcRealm{
 	@RequestMapping(value = RESTRoutes.LOGIN, method = RequestMethod.POST)
 	public @ResponseBody void loginUser(
 			HttpServletRequest request,
-			HttpServletResponse response) {
+			HttpServletResponse response) throws SQLException {
 		Subject currentUser = SecurityUtils.getSubject();
 		
 		//both email and password are base64 encoded
@@ -82,45 +82,112 @@ public class RESTAuthentication extends JdbcRealm{
 		
 		Session session = currentUser.getSession();
 		
-		//only authenticate against actual users
-		if(!StringUtils.isBlank(emailAddress)){
-			//check if this is a different user from the current user
-			boolean differnetUser = !StringUtils.equalsIgnoreCase(emailAddress, (String) currentUser.getPrincipal()); //principal data point is their email address
-			if(differnetUser){ //different user logging in, invalidate the session and create a new one
-				currentUser.getSession(false);
-				currentUser.logout();
-			}
-			if ( !currentUser.isAuthenticated()) { //only do authentication if necessary, its expensive
-			    UsernamePasswordToken token = new UsernamePasswordToken(emailAddress, password);
-			    if(StringUtils.equalsIgnoreCase(rememberMe, "true")){
-			    	token.setRememberMe(true);
-			    }else{
-			    	token.setRememberMe(false);
-			    }
-			    currentUser.login(token);
-			    
-			    if(currentUser.isAuthenticated()){
-			    	if(session == null){ //get a new session
-			    		session = currentUser.getSession();
-			    	}
-			    	node.put("ticket", session.getId().toString());
-			    }
-			}else{
-				node.put("ticket", session.getId().toString());
-			}
+		Connection connection = DatabaseConnection.connect();
+		if(connection == null){
+			throw new AuthenticationException("Database connection error");
 		}
+		
 		response.setContentType("application/json");
+		
+		//only authenticate against actual users
+		if ( !currentUser.isAuthenticated()) { //only do authentication if necessary
+		    UsernamePasswordToken token = new UsernamePasswordToken(emailAddress, password);
+		    if(StringUtils.equalsIgnoreCase(rememberMe, "true")){
+		    	token.setRememberMe(true);
+		    }else{
+		    	token.setRememberMe(false);
+		    }
+
+		    try {
+		        currentUser.login(token);
+		    }catch ( IncorrectCredentialsException ice ) {
+		    	node.put("error", "Credentials Error: " + ice.getMessage());
+		    } catch ( LockedAccountException lae ) {
+		    	node.put("error", "Locked Account Error: " + lae.getMessage());
+		    } catch ( ExcessiveAttemptsException eae ) {
+		    	node.put("error", "Excessive Attempts Error: " + eae.getMessage());
+		    } catch ( AuthenticationException ae ) {
+		    	node.put("error", "Authentication Error: " + ae.getMessage());
+		    }
+		    //no errors, send back session ticket
+		    if(currentUser.isAuthenticated()){
+		    	if(session == null){ //get a new session
+		    		session = currentUser.getSession();
+		    	}
+		    	node.put("ticket", session.getId().toString());
+		    	node.put("status", HttpServletResponse.SC_ACCEPTED);
+		    }else{
+		    	response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+		    	node.put("status", HttpServletResponse.SC_UNAUTHORIZED);
+		    }
+		}else{
+			node.put("ticket", session.getId().toString());
+		}
 		try {
 			response.getWriter().print(node);
 		} catch (IOException e) {
-			logger.debug("Failed to create JSON object: " + e.getMessage());
+			logger.debug("Failed to create JSON response: " + e.getMessage());
+		}finally{
+			connection.close();
 		}
+		
 	}
 	
 	@RequestMapping(value = RESTRoutes.LOGOUT, method = RequestMethod.POST)
 	public @ResponseBody void logoutUser() {
 		Subject currentUser = SecurityUtils.getSubject();
 		currentUser.logout();
+	}
+	
+	@RequestMapping(value = RESTRoutes.CREATE_ACCOUNT, method = RequestMethod.POST)
+	public @ResponseBody void createAccount(
+			HttpServletRequest request,
+			HttpServletResponse response){
+		try{
+			Connection connection = DatabaseConnection.connect();
+			if(connection == null){
+				throw new AuthenticationException("Database connection error");
+			}
+			
+			//both email and password are base64 encoded
+			String emailAddress = request.getParameter("emailAddress");
+			char[] password = request.getParameter("password").toCharArray();
+					
+			SimpleDateFormat dateFormatGmt = new SimpleDateFormat("yyyy-MMM-dd HH:mm:ss");
+			dateFormatGmt.setTimeZone(TimeZone.getTimeZone("UTC"));
+			String dateString = dateFormatGmt.format(new Date());
+			
+			String salt = getSalt();
+			
+			String encryptedPassword = encrypt(password, salt);
+			
+			Statement statement = connection.createStatement();
+			
+		    String sql = "INSERT INTO users (email, password, creation_date, last_accessed, salt) " +
+		     "VALUES ('" + emailAddress + "', '" + encryptedPassword + "', '" + dateString + "', '" + dateString + "', '" + salt + "')";
+		    statement.executeUpdate(sql);
+		}catch(Exception e){
+			logger.debug("Failed to create user: " + e.getMessage());
+		}
+	}
+	
+	public static boolean userExists(String emailAddress) throws SQLException{
+		Connection connection = DatabaseConnection.connect();
+		if(connection == null){
+			throw new AuthenticationException("Database connection error");
+		}
+		
+		Statement statement = connection.createStatement();
+		
+		if(StringUtils.isBlank(emailAddress) ){
+			throw new AuthenticationException("Username is null - Authentication failed.");
+		}
+		
+		ResultSet userCredentials = statement.executeQuery("select password, salt from users where lower(email) like lower('" + emailAddress + "')");
+		
+		boolean userExists = userCredentials.isBeforeFirst();
+		connection.close();
+		return userExists;
 	}
 	
 	/**
@@ -171,7 +238,7 @@ public class RESTAuthentication extends JdbcRealm{
 		
 		Connection connection = DatabaseConnection.connect();
 		if(connection == null){
-			return null;
+			throw new AuthenticationException("Database connection error");
 		}
 		
 		try{
@@ -180,31 +247,37 @@ public class RESTAuthentication extends JdbcRealm{
 			UsernamePasswordToken credentials = (UsernamePasswordToken) token;
 			
 			if(StringUtils.isBlank( credentials.getUsername()) ){
-				throw new AuthenticationException("Username is null- Authentication failed.");
+				throw new AuthenticationException("Username is null - Authentication failed.");
 			}
-			SimpleDateFormat dateFormatGmt = new SimpleDateFormat("yyyy-MMM-dd HH:mm:ss");
-			dateFormatGmt.setTimeZone(TimeZone.getTimeZone("UTC"));
-			String dateString = dateFormatGmt.format(new Date());
 			
-			ResultSet exsists = statement.executeQuery("select email from users where lower(email) like lower('" + credentials.getUsername() + "')");
+			ResultSet userCredentials = statement.executeQuery("select password, salt from users where lower(email) like lower('" + credentials.getUsername() + "')");
 			
-			boolean userExists = exsists.isBeforeFirst();
+			boolean userExists = userCredentials.isBeforeFirst();
 			
 			if(userExists){
-				logger.debug("User exists");
+				logger.debug("User exists - checking credentials");
+				userCredentials.next();
+				String userPassword = userCredentials.getString("password");
+				String userSalt = userCredentials.getString("salt");
+				//encrypt the user's input against those stored in the db
+				if(!StringUtils.equals(userPassword, encrypt(credentials.getPassword(), userSalt)) ){
+					throw new IncorrectCredentialsException("Incorrect Password");
+				}else{
+					connection.close();
+					return new SimpleAuthenticationInfo(token.getPrincipal(), token.getCredentials(), this.getClass().getSimpleName());
+				}
 			}else{
-				String salt = getSalt();
-				
-				String encryptedPassword = encrypt(credentials.getPassword(), salt);
-				
-			    String sql = "INSERT INTO users (email, password, creation_date, last_accessed, salt) " +
-			     "VALUES ('" + credentials.getUsername() + "', '" + encryptedPassword + "', '" + dateString + "', '" + dateString + "', '" + salt + "')";
-			    statement.executeUpdate(sql);		
+				throw new UnknownAccountException("User not found");
 			}
 		}catch(Exception e){
 			logger.debug("Query failed " + e.getMessage());
+		}finally{
+			try {
+				connection.close();
+			} catch (SQLException e) {
+				logger.debug("Connection close failed: " + e.getMessage());
+			}
 		}
-		
-		return new SimpleAuthenticationInfo(token.getPrincipal(), token.getCredentials(), this.getClass().getSimpleName());
+		return null; //failed to authenticate
 	}
 }
