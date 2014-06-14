@@ -63,7 +63,7 @@ public class DatabaseConnection {
 		if (connection != null) {
 			logger.debug("Connected to database");
 		} else {
-			System.out.println("Failed to make connection!");
+			logger.debug("Failed to make connection!");
 		}
 		return connection;
 		

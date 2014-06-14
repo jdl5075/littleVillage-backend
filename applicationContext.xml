@@ -35,6 +35,9 @@
 	<bean id="myRealm" class="com.rest.authentication.RESTAuthentication">
 	</bean>
 	
+	<bean id="records" class="com.rest.records.RESTRecords">
+	</bean>
+	
 	<bean id="databaseConnection" class="com.db.connect.DatabaseConnection">
 		<property name="dbUrl" value="${db.url}"/>
 		<property name="dbUsername" value="${db.username}"/>

@@ -122,6 +122,7 @@ public class RESTAuthentication extends JdbcRealm{
 		    }
 		}else{
 			node.put("ticket", session.getId().toString());
+			node.put("status", HttpServletResponse.SC_ACCEPTED);
 		}
 		try {
 			response.getWriter().print(node);
@@ -133,18 +134,29 @@ public class RESTAuthentication extends JdbcRealm{
 		
 	}
 	
-	@RequestMapping(value = RESTRoutes.LOGOUT, method = RequestMethod.POST)
-	public @ResponseBody void logoutUser() {
+	@RequestMapping(value = RESTRoutes.LOGOUT, method = RequestMethod.GET)
+	public @ResponseBody void logoutUser(
+			HttpServletRequest request,
+			HttpServletResponse response
+		) {
 		Subject currentUser = SecurityUtils.getSubject();
+		String message = currentUser.getPrincipal() + " logged out";
 		currentUser.logout();
+		ObjectNode node = mapper.createObjectNode();
+		node.put("status", message);
+		try {
+			response.getWriter().print(node);
+		} catch (IOException e) {
+			logger.debug("Failed to create JSON response: " + e.getMessage());
+		}
 	}
 	
 	@RequestMapping(value = RESTRoutes.CREATE_ACCOUNT, method = RequestMethod.POST)
 	public @ResponseBody void createAccount(
 			HttpServletRequest request,
 			HttpServletResponse response){
+		Connection connection = DatabaseConnection.connect();
 		try{
-			Connection connection = DatabaseConnection.connect();
 			if(connection == null){
 				throw new AuthenticationException("Database connection error");
 			}
@@ -163,11 +175,33 @@ public class RESTAuthentication extends JdbcRealm{
 			
 			Statement statement = connection.createStatement();
 			
-		    String sql = "INSERT INTO users (email, password, creation_date, last_accessed, salt) " +
-		     "VALUES ('" + emailAddress + "', '" + encryptedPassword + "', '" + dateString + "', '" + dateString + "', '" + salt + "')";
-		    statement.executeUpdate(sql);
+		    response.setContentType("application/json");
+		    
+		    ObjectNode node = mapper.createObjectNode();
+		    
+			if(!userExists(emailAddress)){
+			
+			    String sql = "INSERT INTO users (email, password, creation_date, last_accessed, salt) " +
+			     "VALUES ('" + emailAddress + "', '" + encryptedPassword + "', '" + dateString + "', '" + dateString + "', '" + salt + "')";
+			    statement.executeUpdate(sql);
+			    
+			    node.put("response", "Successfully created an account for " + emailAddress);
+			}else{
+				node.put("response", emailAddress + " already exists");
+			}
+		    try {
+				response.getWriter().print(node);
+			} catch (IOException e) {
+				logger.debug("Failed to create JSON response: " + e.getMessage());
+			}
 		}catch(Exception e){
 			logger.debug("Failed to create user: " + e.getMessage());
+		}finally{
+			try {
+				connection.close();
+			} catch (SQLException e) {
+				logger.debug("Failed to close connection: " + e.getMessage());
+			}
 		}
 	}
 	
@@ -269,8 +303,10 @@ public class RESTAuthentication extends JdbcRealm{
 			}else{
 				throw new UnknownAccountException("User not found");
 			}
-		}catch(Exception e){
-			logger.debug("Query failed " + e.getMessage());
+		} catch (SQLException e) {
+			logger.debug("SQL exception: " + e.getMessage());
+		} catch (SignatureException e) {
+			logger.debug("Signature exception: " + e.getMessage());
 		}finally{
 			try {
 				connection.close();
@@ -278,6 +314,6 @@ public class RESTAuthentication extends JdbcRealm{
 				logger.debug("Connection close failed: " + e.getMessage());
 			}
 		}
-		return null; //failed to authenticate
+		return null;
 	}
 }
