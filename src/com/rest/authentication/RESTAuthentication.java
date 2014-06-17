@@ -186,7 +186,7 @@ public class RESTAuthentication extends JdbcRealm{
 			if(!userExists(emailAddress)){
 			
 			    String sql = "INSERT INTO users (email, password, creation_date, last_accessed, salt) " +
-			     "VALUES ('" + emailAddress + "', '" + encryptedPassword + "', '" + dateString + "', '" + dateString + "', '" + salt + "')";
+			     "VALUES ('" + emailAddress + "', '" + new String(encryptedPassword) + "', '" + dateString + "', '" + dateString + "', '" + salt + "')";
 			    statement.executeUpdate(sql);
 			    
 			    node.put("response", "Successfully created an account for " + emailAddress);
@@ -260,6 +260,16 @@ public class RESTAuthentication extends JdbcRealm{
 		try {
 			if(validatePasswordResetToken(emailAddress, token)){
 				resetPassword(emailAddress, password);
+				
+				response.setContentType("application/json");
+			    
+			    ObjectNode node = mapper.createObjectNode();
+			    try {
+			    	node.put("message", "Password for " + emailAddress + " has been reset");
+					response.getWriter().print(node);
+				}catch (IOException e) {
+					logger.debug("Failed to create JSON response: " + e.getMessage());
+				}	
 			}
 		} catch (NoSuchAlgorithmException e) {
 			logger.debug("Algoruthm not found: " + e.getMessage());
@@ -317,7 +327,7 @@ public class RESTAuthentication extends JdbcRealm{
 			byte[] rawHmac = mac.doFinal(new String(data).getBytes("UTF-8"));
 
 			// base64-encode the hmac
-			encodedBytes = Base64.encodeBase64URLSafe(rawHmac);
+			encodedBytes = Base64.encodeBase64(rawHmac);
 		} catch (Exception e) {
 			throw new SignatureException("Failed to generate HMAC : "
 					+ e.getMessage());
@@ -335,12 +345,13 @@ public class RESTAuthentication extends JdbcRealm{
 		DateTime expiratonDate = new DateTime(DateTimeZone.UTC).plusDays(1);
 		
 		//get a fresh salt for this authentication token
-		String guid = getSalt();
+		String expiry_salt = getSalt();
 		
 		Timestamp timestamp = new Timestamp(expiratonDate.getMillis());
 		try{
 			Statement statement = connection.createStatement();
-			String sql = "UPDATE users SET expiry_date='" + timestamp.toString() + "', expiry_salt='" + guid + "' WHERE email='" + emailAddress + "';";
+			String sql = "INSERT INTO password_tokens (email, expiry_salt, expiry_date) VALUES('" + emailAddress + "', '" + expiry_salt + "', '" + timestamp + "');";
+//			String sql = "UPDATE password_tokens SET expiry_date='" + timestamp.toString() + "', expiry_salt='" + guid + "' WHERE email='" + emailAddress + "';";
 			statement.executeUpdate(sql);
 		}catch (Exception e) {
 			logger.debug("Failed to generate password reset token: " + e.getMessage());
@@ -351,7 +362,7 @@ public class RESTAuthentication extends JdbcRealm{
 				logger.debug("Failed to close db connection: " + e.getMessage());
 			}
 		}
-		return guid;
+		return expiry_salt;
 	}
 	
 	public boolean validatePasswordResetToken(String emailAddress, String token){
@@ -362,7 +373,7 @@ public class RESTAuthentication extends JdbcRealm{
 		
 		try{
 			Statement statement = connection.createStatement();
-			String sql = "SELECT expiry_date, expiry_salt FROM users WHERE email='" + emailAddress + "';";
+			String sql = "SELECT expiry_date, expiry_salt FROM password_tokens WHERE email='" + emailAddress + "';";
 			
 			ResultSet tokenCredentials = statement.executeQuery(sql);
 			
@@ -409,10 +420,13 @@ public class RESTAuthentication extends JdbcRealm{
 			
 			byte[] encryptedPassword = encrypt(password, salt);
 			
-			String sql = "UPDATE users SET password='" + encryptedPassword + "', salt='" + salt + "' WHERE email='" + emailAddress + "';";
+			String sql = "UPDATE users SET password='" + new String(encryptedPassword) + "', salt='" + salt + "' WHERE email='" + emailAddress + "';";
+			statement.executeUpdate(sql);
+			
+			sql = "DELETE FROM password_tokens WHERE email = '" + emailAddress + "';";
 			statement.executeUpdate(sql);
 		}catch (SQLException e) {
-			logger.debug("Failed to generate password reset token: " + e.getMessage());
+			logger.debug("Failed to reset password: " + e.getMessage());
 		}finally{
 			connection.close();
 		}
