@@ -11,7 +11,7 @@ public class DatabaseConnection {
 	
 	static Logger logger = Logger.getLogger(DatabaseConnection.class);
 	
-	@Value(value="${db.url}")
+	@Value(value="${jdbc.url}")
 	private static String dbUrl;
 	
 	public String getDbUrl(){
@@ -22,7 +22,7 @@ public class DatabaseConnection {
 		this.dbUrl = dbUrl;
 	}
 	 
-	@Value(value="${db.username}")
+	@Value(value="${jdbc.username}")
 	private static String dbUsername;
 	
 	public String getDbUsername(){
@@ -33,7 +33,7 @@ public class DatabaseConnection {
 		this.dbUsername = dbUsername;
 	}
 	 
-	@Value(value="${db.password}")
+	@Value(value="${jdbc.password}")
 	private static String dbPassword;
 	
 	public String getDbPassword(){
