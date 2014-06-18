@@ -59,9 +59,7 @@ public class DatabaseConnection {
 			logger.debug("Connection failed: " + e.getMessage());
 		}
 	
-		if (connection != null) {
-			logger.debug("Connected to database");
-		} else {
+		if (connection == null) {
 			logger.debug("Failed to make connection!");
 		}
 		return connection;

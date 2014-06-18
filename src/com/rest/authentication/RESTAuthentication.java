@@ -75,7 +75,7 @@ public class RESTAuthentication extends JdbcRealm{
     }
     
 	@RequestMapping(value = RESTRoutes.LOGIN, method = RequestMethod.POST)
-	public @ResponseBody String loginUser(
+	public @ResponseBody ObjectNode loginUser(
 			HttpServletRequest request,
 			HttpServletResponse response) throws SQLException {
 		Subject currentUser = SecurityUtils.getSubject();
@@ -94,7 +94,7 @@ public class RESTAuthentication extends JdbcRealm{
 			throw new AuthenticationException("Database connection error");
 		}
 		
-		response.setContentType("application/json");
+		currentUser.logout(); //logout on a login attempt
 		
 		//only authenticate against actual users
 		if ( !currentUser.isAuthenticated()) { //only do authentication if necessary
@@ -130,7 +130,7 @@ public class RESTAuthentication extends JdbcRealm{
 		}
 		
 		connection.close();
-		return node.toString();
+		return node;
 	}
 	
 	@RequestMapping(value = RESTRoutes.LOGOUT, method = RequestMethod.GET)
@@ -145,7 +145,7 @@ public class RESTAuthentication extends JdbcRealm{
 	}
 	
 	@RequestMapping(value = RESTRoutes.CREATE_ACCOUNT, method = RequestMethod.POST)
-	public @ResponseBody String createAccount(
+	public @ResponseBody ObjectNode createAccount(
 			HttpServletRequest request,
 			HttpServletResponse response){
 		Connection connection = DatabaseConnection.connect();
@@ -182,7 +182,7 @@ public class RESTAuthentication extends JdbcRealm{
 			}else{
 				node.put("response", emailAddress + " already exists");
 			}
-		    return node.toString();
+		    return node;
 		}catch(Exception e){
 			logger.debug("Failed to create user: " + e.getMessage());
 		}finally{
@@ -192,7 +192,7 @@ public class RESTAuthentication extends JdbcRealm{
 				logger.debug("Failed to close connection: " + e.getMessage());
 			}
 		}
-		return "";
+		return null;
 	}
 	
 	@RequestMapping(value= RESTRoutes.GENERATE_PASSWORD_TOKEN, method= RequestMethod.GET)
@@ -422,14 +422,11 @@ public class RESTAuthentication extends JdbcRealm{
 	
 	@Override
 	protected AuthorizationInfo doGetAuthorizationInfo(PrincipalCollection principals) {
-		logger.debug("Authorizing...");
         return new SimpleAuthorizationInfo();
 	}
 
 	@Override
 	protected AuthenticationInfo doGetAuthenticationInfo(AuthenticationToken token) throws AuthenticationException {
-		logger.debug("Authenticating...");
-		
 		Connection connection = DatabaseConnection.connect();
 		if(connection == null){
 			throw new AuthenticationException("Database connection error");

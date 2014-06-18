@@ -29,6 +29,9 @@
 	
 	<bean id="securityManager" class="org.apache.shiro.web.mgt.DefaultWebSecurityManager">
 	    <property name="realm" ref="myRealm"/>
+    <!-- By default the servlet container sessions will be used.  Uncomment this line
+         to use shiro's native sessions (see the JavaDoc for more): -->
+    	<property name="sessionMode" value="native"/>
 	</bean>
 	<bean id="lifecycleBeanPostProcessor" class="org.apache.shiro.spring.LifecycleBeanPostProcessor"/>
 	
@@ -43,29 +46,4 @@
 		<property name="dbUsername" value="${jdbc.username}"/>
 		<property name="dbPassword" value="${jdbc.password}"/>
 	</bean>
-	
-	<!-- <bean id="sessionFactory"
-    	class="org.springframework.orm.hibernate4.LocalSessionFactoryBean">
-      <property name="dataSource" ref="dataSource" />
-      <property name="packagesToScan" value="org.baeldung.spring.persistence.model" />
-      <property name="hibernateProperties">
-         <props>
-            <prop key="hibernate.hbm2ddl.auto">${hibernate.hbm2ddl.auto}</prop>
-            <prop key="hibernate.dialect">${hibernate.dialect}</prop>
-         </props>
-      </property>
-   </bean>
-   
-   <bean id="dataSource"
-    class="org.apache.tomcat.dbcp.dbcp.BasicDataSource">
-      <property name="dbUrl" value="${jdbc.url}" />
-      <property name="dbUsername" value="${jdbc.user}" />
-      <property name="dbPassword" value="${jdbc.pass}" />
-   </bean>
-
-   <bean id="txManager"
-    class="org.springframework.orm.hibernate4.HibernateTransactionManager">
-      <property name="sessionFactory" ref="sessionFactory" />
-   </bean> -->
-	
 </beans>
