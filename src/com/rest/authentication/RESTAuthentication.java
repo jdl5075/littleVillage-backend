@@ -134,14 +134,16 @@ public class RESTAuthentication extends JdbcRealm{
 	}
 	
 	@RequestMapping(value = RESTRoutes.LOGOUT, method = RequestMethod.GET)
-	public @ResponseBody String logoutUser(
+	public @ResponseBody ObjectNode logoutUser(
 			HttpServletRequest request,
 			HttpServletResponse response
 		) {
 		Subject currentUser = SecurityUtils.getSubject();
 		String message = currentUser.getPrincipal() + " logged out";
 		currentUser.logout();
-		return message;
+		ObjectNode node = mapper.createObjectNode();
+		node.put("message", message);
+		return node;
 	}
 	
 	@RequestMapping(value = RESTRoutes.CREATE_ACCOUNT, method = RequestMethod.POST)
