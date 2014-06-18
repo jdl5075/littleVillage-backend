@@ -66,7 +66,7 @@ public class RESTAuthentication extends JdbcRealm{
 	final ObjectMapper mapper = new ObjectMapper();
 	
 	//Add salt
-    private static String getSalt() throws NoSuchAlgorithmException
+    public static String getSalt() throws NoSuchAlgorithmException
     {
     	byte[] salt = new byte[32];
         SecureRandom random = SecureRandom.getInstance("SHA1PRNG");

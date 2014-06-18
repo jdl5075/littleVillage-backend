@@ -9,14 +9,15 @@ import org.codehaus.jackson.node.ObjectNode;
 
 public abstract class AbstractRESTController {
 	
-	final protected ObjectMapper mapper = new ObjectMapper();
+	final static protected ObjectMapper mapper = new ObjectMapper();
 	
 	public String resolveTicket(String ticket, String cookieTicket) throws UnauthorizedException{
 		Subject currentUser = SecurityUtils.getSubject();
 		String sessionTicket = (String) currentUser.getSession().getId();
 		
-		if(StringUtils.equalsIgnoreCase(ticket, sessionTicket) ||
-				StringUtils.equalsIgnoreCase(cookieTicket, sessionTicket)){
+		if(!StringUtils.isBlank(sessionTicket) && 
+				(StringUtils.equalsIgnoreCase(ticket, sessionTicket) ||
+				StringUtils.equalsIgnoreCase(cookieTicket, sessionTicket)) ){
 			return sessionTicket;
 		}else{
 			ObjectNode node = mapper.createObjectNode();
