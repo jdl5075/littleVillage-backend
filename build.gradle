@@ -37,7 +37,7 @@ sourceSets {
 
 war{
 	webInf { from 'web.xml' }
-	webInf { from 'mvc-dispatcher-servlet.xml' }
+	webInf { from 'spring-dispatcher-servlet.xml' }
 	webInf { from 'applicationContext.xml' }
 }
 

@@ -54,8 +54,7 @@ public class DatabaseConnection {
 		Connection connection = null;
 	
 		try {
-			connection = DriverManager.getConnection(
-					dbUrl, dbUsername, dbPassword);
+			connection = DriverManager.getConnection(dbUrl, dbUsername, dbPassword);
 		} catch (SQLException e) {
 			logger.debug("Connection failed: " + e.getMessage());
 		}

@@ -75,7 +75,7 @@ public class RESTAuthentication extends JdbcRealm{
     }
     
 	@RequestMapping(value = RESTRoutes.LOGIN, method = RequestMethod.POST)
-	public @ResponseBody void loginUser(
+	public @ResponseBody String loginUser(
 			HttpServletRequest request,
 			HttpServletResponse response) throws SQLException {
 		Subject currentUser = SecurityUtils.getSubject();
@@ -128,35 +128,24 @@ public class RESTAuthentication extends JdbcRealm{
 		}else{
 			node.put("ticket", session.getId().toString());
 		}
-		try {
-			response.getWriter().print(node);
-		} catch (IOException e) {
-			logger.debug("Failed to create JSON response: " + e.getMessage());
-		}finally{
-			connection.close();
-		}
 		
+		connection.close();
+		return node.toString();
 	}
 	
 	@RequestMapping(value = RESTRoutes.LOGOUT, method = RequestMethod.GET)
-	public @ResponseBody void logoutUser(
+	public @ResponseBody String logoutUser(
 			HttpServletRequest request,
 			HttpServletResponse response
 		) {
 		Subject currentUser = SecurityUtils.getSubject();
 		String message = currentUser.getPrincipal() + " logged out";
 		currentUser.logout();
-		ObjectNode node = mapper.createObjectNode();
-		node.put("status", message);
-		try {
-			response.getWriter().print(node);
-		} catch (IOException e) {
-			logger.debug("Failed to create JSON response: " + e.getMessage());
-		}
+		return message;
 	}
 	
 	@RequestMapping(value = RESTRoutes.CREATE_ACCOUNT, method = RequestMethod.POST)
-	public @ResponseBody void createAccount(
+	public @ResponseBody String createAccount(
 			HttpServletRequest request,
 			HttpServletResponse response){
 		Connection connection = DatabaseConnection.connect();
@@ -193,11 +182,7 @@ public class RESTAuthentication extends JdbcRealm{
 			}else{
 				node.put("response", emailAddress + " already exists");
 			}
-		    try {
-				response.getWriter().print(node);
-			} catch (IOException e) {
-				logger.debug("Failed to create JSON response: " + e.getMessage());
-			}
+		    return node.toString();
 		}catch(Exception e){
 			logger.debug("Failed to create user: " + e.getMessage());
 		}finally{
@@ -207,10 +192,11 @@ public class RESTAuthentication extends JdbcRealm{
 				logger.debug("Failed to close connection: " + e.getMessage());
 			}
 		}
+		return "";
 	}
 	
 	@RequestMapping(value= RESTRoutes.GENERATE_PASSWORD_TOKEN, method= RequestMethod.GET)
-	public @ResponseBody void generatePasswordToken(
+	public @ResponseBody ObjectNode generatePasswordToken(
 			HttpServletRequest request,
 			HttpServletResponse response,
 			@RequestParam(value="email", required = true) String emailAddress){
@@ -219,16 +205,15 @@ public class RESTAuthentication extends JdbcRealm{
 	    ObjectNode node = mapper.createObjectNode();
 	    try {
 			node.put("token", generatePasswordResetToken(emailAddress) );
-			response.getWriter().print(node);
+			return node;
 		} catch (NoSuchAlgorithmException e) {
 			logger.debug("Failed to generate password token: " + e.getMessage());
-		}catch (IOException e) {
-			logger.debug("Failed to create JSON response: " + e.getMessage());
-		}	
+		}
+	    return null;
 	}
 	
 	@RequestMapping(value= RESTRoutes.VALIDATE_PASSWORD_TOKEN, method= RequestMethod.GET)
-	public @ResponseBody void validatePasswordToken(
+	public @ResponseBody ObjectNode validatePasswordToken(
 			HttpServletRequest request,
 			HttpServletResponse response,
 			@RequestParam(value="email", required = true) String email,
@@ -237,21 +222,17 @@ public class RESTAuthentication extends JdbcRealm{
 		response.setContentType("application/json");
 	    
 	    ObjectNode node = mapper.createObjectNode();
-	    try {
-	    	boolean valid = validatePasswordResetToken(email, token);
-	    	node.put("token", token );
-			node.put("valid",  valid);
-			if(!valid){
-				response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-			}
-			response.getWriter().print(node);
-		}catch (IOException e) {
-			logger.debug("Failed to create JSON response: " + e.getMessage());
-		}	
+	    boolean valid = validatePasswordResetToken(email, token);
+    	node.put("token", token );
+		node.put("valid",  valid);
+		if(!valid){
+			response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+		}
+		return node;
 	}
 	
 	@RequestMapping(value = RESTRoutes.RESET_PASSWORD, method = RequestMethod.POST)
-	public @ResponseBody void resetPassword(
+	public @ResponseBody ObjectNode resetPassword(
 		HttpServletRequest request,
 		HttpServletResponse response){
 		String emailAddress = request.getParameter("email");
@@ -264,12 +245,8 @@ public class RESTAuthentication extends JdbcRealm{
 				response.setContentType("application/json");
 			    
 			    ObjectNode node = mapper.createObjectNode();
-			    try {
-			    	node.put("message", "Password for " + emailAddress + " has been reset");
-					response.getWriter().print(node);
-				}catch (IOException e) {
-					logger.debug("Failed to create JSON response: " + e.getMessage());
-				}	
+			    node.put("message", "Password for " + emailAddress + " has been reset");
+				return node;
 			}
 		} catch (NoSuchAlgorithmException e) {
 			logger.debug("Algoruthm not found: " + e.getMessage());
@@ -278,6 +255,7 @@ public class RESTAuthentication extends JdbcRealm{
 		} catch (SQLException e) {
 			logger.debug("Failed to reset password: " + e.getMessage());
 		}
+		return null;
 	}
 	
 	public static boolean userExists(String emailAddress) throws SQLException{
@@ -350,8 +328,18 @@ public class RESTAuthentication extends JdbcRealm{
 		Timestamp timestamp = new Timestamp(expiratonDate.getMillis());
 		try{
 			Statement statement = connection.createStatement();
-			String sql = "INSERT INTO password_tokens (email, expiry_salt, expiry_date) VALUES('" + emailAddress + "', '" + expiry_salt + "', '" + timestamp + "');";
-//			String sql = "UPDATE password_tokens SET expiry_date='" + timestamp.toString() + "', expiry_salt='" + guid + "' WHERE email='" + emailAddress + "';";
+			
+			String sql = "SELECT expiry_date, expiry_salt FROM password_tokens WHERE email='" + emailAddress + "';";
+			
+			ResultSet tokenCredentials = statement.executeQuery(sql);
+			
+			boolean tokenExists = tokenCredentials.isBeforeFirst();
+			
+			if(tokenExists){
+				sql = "UPDATE password_tokens SET expiry_salt='" + expiry_salt + "', expiry_date='" + timestamp + "' WHERE email='" + emailAddress + "';";
+			}else{
+				sql = "INSERT INTO password_tokens (email, expiry_salt, expiry_date) VALUES('" + emailAddress + "', '" + expiry_salt + "', '" + timestamp + "');";
+			}
 			statement.executeUpdate(sql);
 		}catch (Exception e) {
 			logger.debug("Failed to generate password reset token: " + e.getMessage());
