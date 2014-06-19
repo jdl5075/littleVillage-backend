@@ -14,17 +14,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-public class RESTAuthenticationTest {
+public class EncryptionUtilsTest {
     @Autowired
     private RestTemplate restTemplate;
     
     @Test public void createsSaltsAsBase64UrlEncoded() throws NoSuchAlgorithmException {
-    	String salt = RESTAuthentication.getSalt();
+    	String salt = EncryptionUtils.getSalt();
     	assertTrue(Base64.isBase64(salt));
     }
     
     @Test public void creates32ByteSalts() throws NoSuchAlgorithmException {
-    	String salt = RESTAuthentication.getSalt();
+    	String salt = EncryptionUtils.getSalt();
     	assertEquals(Base64.decodeBase64(salt).length, 32);
     }
 }

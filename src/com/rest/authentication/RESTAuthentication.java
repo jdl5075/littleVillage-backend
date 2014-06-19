@@ -59,21 +59,9 @@ import com.rest.routes.RESTRoutes;
  */
 @Controller
 public class RESTAuthentication extends JdbcRealm{
-	private static final String HMAC_SHA1_ALGORITHM = "HmacSHA1";
-	
+	final ObjectMapper mapper = new ObjectMapper();
 	Logger logger = Logger.getLogger(RESTAuthentication.class);
 	
-	final ObjectMapper mapper = new ObjectMapper();
-	
-	//Add salt
-    public static String getSalt() throws NoSuchAlgorithmException
-    {
-    	byte[] salt = new byte[32];
-        SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
-        random.nextBytes(salt);
-        return Base64.encodeBase64URLSafeString(salt);
-    }
-    
 	@RequestMapping(value = RESTRoutes.LOGIN, method = RequestMethod.POST)
 	public @ResponseBody ObjectNode loginUser(
 			HttpServletRequest request,
@@ -88,11 +76,6 @@ public class RESTAuthentication extends JdbcRealm{
 		ObjectNode node = mapper.createObjectNode();
 		
 		Session session = currentUser.getSession();
-		
-		Connection connection = DatabaseConnection.connect();
-		if(connection == null){
-			throw new AuthenticationException("Database connection error");
-		}
 		
 		currentUser.logout(); //logout on a login attempt
 		
@@ -129,7 +112,6 @@ public class RESTAuthentication extends JdbcRealm{
 			node.put("ticket", session.getId().toString());
 		}
 		
-		connection.close();
 		return node;
 	}
 	
@@ -164,27 +146,11 @@ public class RESTAuthentication extends JdbcRealm{
 			dateFormatGmt.setTimeZone(TimeZone.getTimeZone("UTC"));
 			String dateString = dateFormatGmt.format(new Date());
 			
-			String salt = getSalt();
+			String salt = EncryptionUtils.getSalt();
 			
-			byte[] encryptedPassword = encrypt(password, salt);
+			byte[] encryptedPassword = EncryptionUtils.encrypt(password, salt);
 			
-			Statement statement = connection.createStatement();
-			
-		    response.setContentType("application/json");
-		    
-		    ObjectNode node = mapper.createObjectNode();
-		    
-			if(!userExists(emailAddress)){
-			
-			    String sql = "INSERT INTO users (email, password, creation_date, last_accessed, salt) " +
-			     "VALUES ('" + emailAddress + "', '" + new String(encryptedPassword) + "', '" + dateString + "', '" + dateString + "', '" + salt + "')";
-			    statement.executeUpdate(sql);
-			    
-			    node.put("response", "Successfully created an account for " + emailAddress);
-			}else{
-				node.put("response", emailAddress + " already exists");
-			}
-		    return node;
+			return AuthenticationDAO.createAccount(emailAddress, encryptedPassword, dateString, salt);
 		}catch(Exception e){
 			logger.debug("Failed to create user: " + e.getMessage());
 		}finally{
@@ -202,11 +168,9 @@ public class RESTAuthentication extends JdbcRealm{
 			HttpServletRequest request,
 			HttpServletResponse response,
 			@RequestParam(value="email", required = true) String emailAddress){
-		response.setContentType("application/json");
-	    
 	    ObjectNode node = mapper.createObjectNode();
 	    try {
-			node.put("token", generatePasswordResetToken(emailAddress) );
+			node.put("token", AuthenticationDAO.generatePasswordResetToken(emailAddress) );
 			return node;
 		} catch (NoSuchAlgorithmException e) {
 			logger.debug("Failed to generate password token: " + e.getMessage());
@@ -224,7 +188,7 @@ public class RESTAuthentication extends JdbcRealm{
 		response.setContentType("application/json");
 	    
 	    ObjectNode node = mapper.createObjectNode();
-	    boolean valid = validatePasswordResetToken(email, token);
+	    boolean valid = AuthenticationDAO.validatePasswordResetToken(email, token);
     	node.put("token", token );
 		node.put("valid",  valid);
 		if(!valid){
@@ -241,10 +205,8 @@ public class RESTAuthentication extends JdbcRealm{
 		char[] password = request.getParameter("password").toCharArray();
 		String token = request.getParameter("token");
 		try {
-			if(validatePasswordResetToken(emailAddress, token)){
-				resetPassword(emailAddress, password);
-				
-				response.setContentType("application/json");
+			if(AuthenticationDAO.validatePasswordResetToken(emailAddress, token)){
+				AuthenticationDAO.resetPassword(emailAddress, password);
 			    
 			    ObjectNode node = mapper.createObjectNode();
 			    node.put("message", "Password for " + emailAddress + " has been reset");
@@ -258,168 +220,6 @@ public class RESTAuthentication extends JdbcRealm{
 			logger.debug("Failed to reset password: " + e.getMessage());
 		}
 		return null;
-	}
-	
-	public static boolean userExists(String emailAddress) throws SQLException{
-		Connection connection = DatabaseConnection.connect();
-		if(connection == null){
-			throw new AuthenticationException("Database connection error");
-		}
-		
-		Statement statement = connection.createStatement();
-		
-		if(StringUtils.isBlank(emailAddress) ){
-			throw new AuthenticationException("Username is null - Authentication failed.");
-		}
-		
-		ResultSet userCredentials = statement.executeQuery("select password, salt from users where lower(email) like lower('" + emailAddress + "')");
-		
-		boolean userExists = userCredentials.isBeforeFirst();
-		connection.close();
-		return userExists;
-	}
-	
-	/**
-	 * Computes RFC 2104-compliant HMAC signature. * @param data The data to be
-	 * signed.
-	 * 
-	 * @param key
-	 *            The signing key.
-	 * @return The Base64-encoded RFC 2104-compliant HMAC signature.
-	 * @throws java.security.SignatureException
-	 *             when signature generation fails
-	 */
-	public static byte[] encrypt(char[] data, String key)
-			throws java.security.SignatureException {
-		String result;
-		byte[] encodedBytes;
-		try {
-
-			// get an hmac_sha1 key from the raw key bytes
-			SecretKeySpec signingKey = new SecretKeySpec(key.getBytes(),
-					HMAC_SHA1_ALGORITHM);
-
-			// get an hmac_sha1 Mac instance and initialize with the signing key
-			Mac mac = Mac.getInstance(HMAC_SHA1_ALGORITHM);
-			mac.init(signingKey);
-
-			// compute the hmac on input data bytes
-			byte[] rawHmac = mac.doFinal(new String(data).getBytes("UTF-8"));
-
-			// base64-encode the hmac
-			encodedBytes = Base64.encodeBase64(rawHmac);
-		} catch (Exception e) {
-			throw new SignatureException("Failed to generate HMAC : "
-					+ e.getMessage());
-		}
-		return encodedBytes;
-	}
-
-	public String generatePasswordResetToken(String emailAddress) throws NoSuchAlgorithmException {
-		Connection connection = DatabaseConnection.connect();
-		if(connection == null){
-			throw new AuthenticationException("Database connection error");
-		}
-		
-		//create a timestamp that expires in 24 hours
-		DateTime expiratonDate = new DateTime(DateTimeZone.UTC).plusDays(1);
-		
-		//get a fresh salt for this authentication token
-		String expiry_salt = getSalt();
-		
-		Timestamp timestamp = new Timestamp(expiratonDate.getMillis());
-		try{
-			Statement statement = connection.createStatement();
-			
-			String sql = "SELECT expiry_date, expiry_salt FROM password_tokens WHERE email='" + emailAddress + "';";
-			
-			ResultSet tokenCredentials = statement.executeQuery(sql);
-			
-			boolean tokenExists = tokenCredentials.isBeforeFirst();
-			
-			if(tokenExists){
-				sql = "UPDATE password_tokens SET expiry_salt='" + expiry_salt + "', expiry_date='" + timestamp + "' WHERE email='" + emailAddress + "';";
-			}else{
-				sql = "INSERT INTO password_tokens (email, expiry_salt, expiry_date) VALUES('" + emailAddress + "', '" + expiry_salt + "', '" + timestamp + "');";
-			}
-			statement.executeUpdate(sql);
-		}catch (Exception e) {
-			logger.debug("Failed to generate password reset token: " + e.getMessage());
-		}finally{
-			try {
-				connection.close();
-			} catch (SQLException e) {
-				logger.debug("Failed to close db connection: " + e.getMessage());
-			}
-		}
-		return expiry_salt;
-	}
-	
-	public boolean validatePasswordResetToken(String emailAddress, String token){
-		Connection connection = DatabaseConnection.connect();
-		if(connection == null){
-			throw new AuthenticationException("Database connection error");
-		}
-		
-		try{
-			Statement statement = connection.createStatement();
-			String sql = "SELECT expiry_date, expiry_salt FROM password_tokens WHERE email='" + emailAddress + "';";
-			
-			ResultSet tokenCredentials = statement.executeQuery(sql);
-			
-			boolean tokenExists = tokenCredentials.isBeforeFirst();
-			
-			if(tokenExists){
-				tokenCredentials.next();
-				Timestamp dt = tokenCredentials.getTimestamp("expiry_date");
-				
-				DateTime now = new DateTime(DateTimeZone.UTC);
-				
-				//convert to joda datetime
-				DateTime expiry_date = new DateTime(dt.getTime(), DateTimeZone.UTC);
-				
-				String expiry_salt = tokenCredentials.getString("expiry_salt");
-				
-				//verify the hash and ensure its inside the 24-hr window
-				return StringUtils.equals(expiry_salt, token) &&
-						now.isBefore(expiry_date);
-			}
-		}catch (SQLException e) {
-			logger.debug("Failed to generate password reset token: " + e.getMessage());
-		}finally{
-			try {
-				connection.close();
-			} catch (SQLException e) {
-				logger.debug("Failed to close db connection: " + e.getMessage());
-			}
-		}
-		return false;
-	}
-	
-	public void resetPassword(String emailAddress, char[] password) 
-			throws NoSuchAlgorithmException, SignatureException, SQLException{
-		Connection connection = DatabaseConnection.connect();
-		if(connection == null){
-			throw new AuthenticationException("Database connection error");
-		}
-		
-		try{
-			Statement statement = connection.createStatement();
-			
-			String salt = getSalt();
-			
-			byte[] encryptedPassword = encrypt(password, salt);
-			
-			String sql = "UPDATE users SET password='" + new String(encryptedPassword) + "', salt='" + salt + "' WHERE email='" + emailAddress + "';";
-			statement.executeUpdate(sql);
-			
-			sql = "DELETE FROM password_tokens WHERE email = '" + emailAddress + "';";
-			statement.executeUpdate(sql);
-		}catch (SQLException e) {
-			logger.debug("Failed to reset password: " + e.getMessage());
-		}finally{
-			connection.close();
-		}
 	}
 	
 	@Override
@@ -453,7 +253,7 @@ public class RESTAuthentication extends JdbcRealm{
 				String userPassword = userCredentials.getString("password");
 				String userSalt = userCredentials.getString("salt");
 				//encrypt the user's input against those stored in the db
-				if(!StringUtils.equals(userPassword, new String(encrypt(credentials.getPassword(), userSalt)) )){
+				if(!StringUtils.equals(userPassword, new String(EncryptionUtils.encrypt(credentials.getPassword(), userSalt)) )){
 					throw new IncorrectCredentialsException("Incorrect Password");
 				}else{
 					connection.close();
