@@ -1,12 +1,57 @@
 For Little Village [Community_Area=30]
 
 City of Chicago crime data
-  https://data.cityofchicago.org/resource/ijzp-q8t2.json?community_area=30
+    https://data.cityofchicago.org/resource/ijzp-q8t2.json?community_area=30
 
-  https://data.cityofchicago.org/resource/ijzp-q8t2.json?$select=primary_type,description&community_area=30
+    https://data.cityofchicago.org/resource/ijzp-q8t2.json?$select=primary_type,description&community_area=30
   
-  Four categories:
-    Firearms
+  Five Categories:
+    *Make an individual call for each crime type, altering the 'primary_type=xxxxxxxx' each time
+    Violent Crime
+      -Homicide
+        https://data.cityofchicago.org/resource/ijzp-q8t2.json?$select=primary_type,date,description,location_description,latitude,longitude,block,arrest,community_area&community_area=30&primary_type=homicide
+      -Assault  
+        https://data.cityofchicago.org/resource/ijzp-q8t2.json?$select=primary_type,date,description,location_description,latitude,longitude,block,arrest,community_area&community_area=30&primary_type=assault
+      -Battery  
+        https://data.cityofchicago.org/resource/ijzp-q8t2.json?$select=primary_type,date,description,location_description,latitude,longitude,block,arrest,community_area&community_area=30&primary_type=battery
+      -Crim sexual assault  
+        https://data.cityofchicago.org/resource/ijzp-q8t2.json?$select=primary_type,date,description,location_description,latitude,longitude,block,arrest,community_area&community_area=30&primary_type=crim sexual assault
+      -Arson  
+        https://data.cityofchicago.org/resource/ijzp-q8t2.json?$select=primary_type,date,description,location_description,latitude,longitude,block,arrest,community_area&community_area=30&primary_type=arson
+      -Weapons violation
+        https://data.cityofchicago.org/resource/ijzp-q8t2.json?$select=primary_type,date,description,location_description,latitude,longitude,block,arrest,community_area&community_area=30&primary_type=weapons violation
+        
+    Property Crime
+      -Burglary
+        https://data.cityofchicago.org/resource/ijzp-q8t2.json?$select=primary_type,date,description,location_description,latitude,longitude,block,arrest,community_area&community_area=30&primary_type=burglary
+      -Theft
+        https://data.cityofchicago.org/resource/ijzp-q8t2.json?$select=primary_type,date,description,location_description,latitude,longitude,block,arrest,community_area&community_area=30&primary_type=theft
+      -Robbery
+        https://data.cityofchicago.org/resource/ijzp-q8t2.json?$select=primary_type,date,description,location_description,latitude,longitude,block,arrest,community_area&community_area=30&primary_type=robbery
+      -Motor vehicle theft
+        https://data.cityofchicago.org/resource/ijzp-q8t2.json?$select=primary_type,date,description,location_description,latitude,longitude,block,arrest,community_area&community_area=30&primary_type=motor vehicle theft
+      -Criminal damage
+        https://data.cityofchicago.org/resource/ijzp-q8t2.json?$select=primary_type,date,description,location_description,latitude,longitude,block,arrest,community_area&community_area=30&primary_type=criminal damage
+      -Criminal trespass
+        https://data.cityofchicago.org/resource/ijzp-q8t2.json?$select=primary_type,date,description,location_description,latitude,longitude,block,arrest,community_area&community_area=30&primary_type=criminal trespass
+    
+    Sin Crime
+      -Narcotics
+        https://data.cityofchicago.org/resource/ijzp-q8t2.json?$select=primary_type,date,description,location_description,latitude,longitude,block,arrest,community_area&community_area=30&primary_type=narcotics
+      -Liquor law violation
+        https://data.cityofchicago.org/resource/ijzp-q8t2.json?$select=primary_type,date,description,location_description,latitude,longitude,block,arrest,community_area&community_area=30&primary_type=liquor law violation
+      -Prostitution
+        https://data.cityofchicago.org/resource/ijzp-q8t2.json?$select=primary_type,date,description,location_description,latitude,longitude,block,arrest,community_area&community_area=30&primary_type=prostitution
+    Children
+        Offense involving children
+        Kidnapping
+    Other
+        Intimidation
+        Other offense
+        Public peace violation
+        Interference with public officer
+        Stalking
+        Deceptive practice
     
 
 City of Chicago 311
