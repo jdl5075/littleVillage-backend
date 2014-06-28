@@ -15,31 +15,8 @@
         </property> 
         <property name="ignoreUnresolvablePlaceholders" value="true"/>
     </bean>
-
-	<bean id="shiroFilter" class="org.apache.shiro.spring.web.ShiroFilterFactoryBean">
-	    <property name="securityManager" ref="securityManager"/>
-	    <property name="loginUrl" value="/login"/>
-	    <property name="successUrl" value="/home"/>
-	    <property name="unauthorizedUrl" value="/unauthorized"/>
-	    <property name="filterChainDefinitions">
-			<value>
-				/login = authc
-			</value>
-		</property>
-	</bean>
 	
-	<bean id="securityManager" class="org.apache.shiro.web.mgt.DefaultWebSecurityManager">
-	    <property name="realm" ref="myRealm"/>
-    <!-- By default the servlet container sessions will be used.  Uncomment this line
-         to use shiro's native sessions (see the JavaDoc for more): -->
-    	<property name="sessionMode" value="native"/>
-	</bean>
-	<bean id="lifecycleBeanPostProcessor" class="org.apache.shiro.spring.LifecycleBeanPostProcessor"/>
-	
-	<bean id="myRealm" class="com.rest.authentication.RESTAuthentication">
-	</bean>
-	
-	<bean id="records" class="com.rest.records.RESTRecords">
+	<bean id="records" class="com.rest.RESTRecords">
 	</bean>
 	
 	<bean id="databaseConnection" class="com.db.connect.DatabaseConnection">

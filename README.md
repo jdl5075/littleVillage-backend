@@ -1,4 +1,4 @@
-spring-mvc
+littleVillage
 ==========
 
 Basic Spring 3 MVC template for building server apps.
@@ -8,7 +8,6 @@ Built using:
 * Gradle
 * Spring MVC
 * Jackson
-* Shiro - for authentication
 * Tomcat 7
 * Java 7
 
@@ -21,3 +20,5 @@ Built using:
 4. Install Tomcat 7+ and ensure that it starts up
 5. Run ``` gradle build ``` and a ``` build ``` directory will be built with the war in the lib directory
 6. Push the war into the webapps directory of your tomcat
+
+jettyRunWar deploys the backend to port 8080
