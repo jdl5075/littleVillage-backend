@@ -19,8 +19,18 @@
 
    	<servlet-mapping>
     	<servlet-name>spring-dispatcher</servlet-name>
-    	<url-pattern>/</url-pattern>
+    	<url-pattern>/rest/*</url-pattern>
    	</servlet-mapping>
+   	
+   	<servlet>
+        <servlet-name>TwilioServlet</servlet-name>
+        <servlet-class>com.twilio.TwilioServlet</servlet-class>
+    </servlet>
+ 
+    <servlet-mapping>
+        <servlet-name>TwilioServlet</servlet-name>
+        <url-pattern>/sms</url-pattern>
+    </servlet-mapping>
    	
    	<listener>
     	<listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
