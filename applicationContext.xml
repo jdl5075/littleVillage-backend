@@ -10,18 +10,23 @@
 	<bean id="propertyConfigurer" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
         <property name="locations">
             <list>
+           	 	<value>classpath:app.properties</value>
                 <value>classpath:jdbc.properties</value>
             </list>
         </property> 
         <property name="ignoreUnresolvablePlaceholders" value="true"/>
     </bean>
 	
-	<bean id="records" class="com.rest.RESTRecords">
+	<bean id="records" class="com.rest.RESTActions">
 	</bean>
 	
 	<bean id="databaseConnection" class="com.db.connect.DatabaseConnection">
 		<property name="dbUrl" value="${jdbc.url}"/>
 		<property name="dbUsername" value="${jdbc.username}"/>
 		<property name="dbPassword" value="${jdbc.password}"/>
+	</bean>
+	
+	<bean id="twilioServlet" class="com.twilio.TwilioServlet">
+		<property name="appRoot" value="${app.appRoot}"/>
 	</bean>
 </beans>
